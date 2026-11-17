@@ -61,6 +61,13 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
     private val hidden = MutableStateFlow(prefs.hidden)
     private val query = MutableStateFlow("")
 
+    private val _isDefaultHome = MutableStateFlow(true)
+    val isDefaultHome: StateFlow<Boolean> = _isDefaultHome
+
+    fun setDefaultHome(value: Boolean) {
+        _isDefaultHome.value = value
+    }
+
     private val _homePressed = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
     val homePressed: SharedFlow<Unit> = _homePressed
 

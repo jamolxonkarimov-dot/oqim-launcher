@@ -81,8 +81,9 @@ private val shadowed = TextStyle(
 )
 
 @Composable
-fun LauncherScreen(vm: LauncherViewModel) {
+fun LauncherScreen(vm: LauncherViewModel, onSetDefault: () -> Unit) {
     val state by vm.uiState.collectAsStateWithLifecycle()
+    val isDefaultHome by vm.isDefaultHome.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
     val focus = LocalFocusManager.current
@@ -102,9 +103,9 @@ fun LauncherScreen(vm: LauncherViewModel) {
     }
 
     // Index of each letter header inside the LazyColumn: clock, favorites title, favorites, then sections.
-    val letterIndex = remember(state.favorites, state.sections) {
+    val letterIndex = remember(state.favorites, state.sections, isDefaultHome) {
         val map = LinkedHashMap<String, Int>()
-        var i = 2 + state.favorites.size
+        var i = 2 + state.favorites.size + (if (isDefaultHome) 0 else 1)
         state.sections.forEach { s ->
             map[s.letter] = i
             i += 1 + s.apps.size
@@ -125,6 +126,9 @@ fun LauncherScreen(vm: LauncherViewModel) {
                         modifier = Modifier.fillMaxSize().padding(end = 36.dp),
                         contentPadding = PaddingValues(bottom = 16.dp),
                     ) {
+                        if (!isDefaultHome) {
+                            item(key = "set-default") { DefaultHomeBanner(onSetDefault) }
+                        }
                         item(key = "clock") { ClockHeader() }
                         item(key = "fav-title") {
                             SectionLabel(
@@ -177,6 +181,25 @@ fun LauncherScreen(vm: LauncherViewModel) {
                 },
             )
         }
+    }
+}
+
+@Composable
+private fun DefaultHomeBanner(onClick: () -> Unit) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .padding(start = 16.dp, top = 16.dp)
+            .background(Color.White.copy(alpha = 0.92f), RoundedCornerShape(16.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 20.dp, vertical = 14.dp),
+    ) {
+        Text("Oqim hali asosiy ekran emas", color = Color.Black, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+        Text(
+            "Bosing va Oqim'ni standart bosh ekran sifatida tanlang. Shunda Home va Orqaga tugmalari to'g'ri ishlaydi.",
+            color = Color.Black.copy(alpha = 0.75f),
+            fontSize = 14.sp,
+        )
     }
 }
 
