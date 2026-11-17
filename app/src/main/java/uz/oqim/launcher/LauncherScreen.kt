@@ -1,5 +1,6 @@
 package uz.oqim.launcher
 
+import android.app.AlarmManager
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -19,6 +20,9 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -81,6 +85,7 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.TextStyle
@@ -93,7 +98,9 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.time.Instant
 import java.time.LocalDateTime
+import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlin.math.exp
@@ -286,15 +293,38 @@ private fun ClockHeader(accent: Color) {
         }
     }
     val battery = rememberBatteryLevel()
+    val greeting = when (now.hour) {
+        in 5..10 -> "Xayrli tong"
+        in 11..16 -> "Xayrli kun"
+        in 17..21 -> "Xayrli kech"
+        else -> "Xayrli tun"
+    }
+    val nextAlarm = remember(now.hour, now.minute) {
+        runCatching {
+            context.getSystemService(AlarmManager::class.java)?.nextAlarmClock?.triggerTime?.let {
+                LocalDateTime.ofInstant(Instant.ofEpochMilli(it), ZoneId.systemDefault())
+                    .format(DateTimeFormatter.ofPattern("HH:mm"))
+            }
+        }.getOrNull()
+    }
     val time = remember(now.hour, now.minute) { now.format(DateTimeFormatter.ofPattern("HH:mm")) }
     val date = remember(now.toLocalDate()) {
         now.format(DateTimeFormatter.ofPattern("EEEE, d MMMM", Locale.getDefault()))
             .replaceFirstChar { it.titlecase(Locale.getDefault()) }
     }
-    Column(Modifier.fillMaxWidth().padding(start = 28.dp, top = 40.dp, bottom = 8.dp)) {
+    Column(Modifier.fillMaxWidth().padding(start = 28.dp, top = 32.dp, bottom = 8.dp)) {
+        Text(
+            greeting,
+            style = shadowed.copy(fontSize = 15.sp, color = accent, fontWeight = FontWeight.Medium, letterSpacing = 1.sp),
+        )
         Text(
             time,
-            style = shadowed.copy(fontSize = 84.sp, fontWeight = FontWeight.Thin, letterSpacing = (-2).sp),
+            style = shadowed.copy(
+                brush = Brush.verticalGradient(listOf(Color.White, Color.White, accent)),
+                fontSize = 88.sp,
+                fontWeight = FontWeight.Thin,
+                letterSpacing = (-2).sp,
+            ),
             modifier = Modifier.clickable {
                 runCatching {
                     context.startActivity(Intent(AlarmClock.ACTION_SHOW_ALARMS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
@@ -317,6 +347,10 @@ private fun ClockHeader(accent: Color) {
             if (battery >= 0) {
                 Box(Modifier.padding(horizontal = 10.dp).size(4.dp).background(accent, CircleShape))
                 Text("$battery%", style = shadowed.copy(fontSize = 17.sp, color = Color.White.copy(alpha = 0.9f)))
+            }
+            if (nextAlarm != null) {
+                Box(Modifier.padding(horizontal = 10.dp).size(4.dp).background(accent, CircleShape))
+                Text("Budilnik $nextAlarm", style = shadowed.copy(fontSize = 17.sp, color = Color.White.copy(alpha = 0.9f)))
             }
         }
     }
@@ -404,7 +438,16 @@ private fun AppDrawer(state: UiState, vm: LauncherViewModel, listState: LazyList
             contentPadding = PaddingValues(bottom = 24.dp),
         ) {
             item(key = "drawer-title") {
-                Row(Modifier.padding(start = 24.dp, top = 28.dp, bottom = 4.dp), verticalAlignment = Alignment.Bottom) {
+              Column {
+                Image(
+                    painter = painterResource(R.drawable.mega_logo),
+                    contentDescription = "Mega Print Service",
+                    modifier = Modifier
+                        .padding(start = 24.dp, top = 28.dp, end = 24.dp)
+                        .height(26.dp)
+                        .aspectRatio(1279.41f / 160.6f),
+                )
+                Row(Modifier.padding(start = 24.dp, top = 20.dp, bottom = 4.dp), verticalAlignment = Alignment.Bottom) {
                     Text("Barcha ilovalar", style = shadowed.copy(fontSize = 30.sp, fontWeight = FontWeight.Light))
                     Text(
                         "  ${state.sections.sumOf { it.apps.size }}",
@@ -412,6 +455,7 @@ private fun AppDrawer(state: UiState, vm: LauncherViewModel, listState: LazyList
                         modifier = Modifier.padding(bottom = 5.dp),
                     )
                 }
+              }
             }
             state.sections.forEach { section ->
                 item(key = "l-" + section.letter) { LetterHeader(section.letter, accent) }
@@ -533,11 +577,22 @@ private fun AppRow(
 ) {
     var menu by remember { mutableStateOf(false) }
     val haptic = LocalHapticFeedback.current
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val press by animateFloatAsState(if (pressed || menu) 1f else 0f, tween(140), label = "press")
     Box {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .graphicsLayer {
+                    val scale = 1f - 0.04f * press
+                    scaleX = scale
+                    scaleY = scale
+                    alpha = 1f - 0.35f * press
+                }
                 .combinedClickable(
+                    interactionSource = interaction,
+                    indication = null,
                     onClick = { vm.launch(app) },
                     onLongClick = {
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
