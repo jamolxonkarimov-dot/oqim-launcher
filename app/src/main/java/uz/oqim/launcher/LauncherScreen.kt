@@ -156,7 +156,7 @@ fun LauncherScreen(vm: LauncherViewModel, onSetDefault: () -> Unit) {
     Box(
         Modifier
             .fillMaxSize()
-            .background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.05f), Color.Black.copy(alpha = 0.55f)))),
+            .background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.05f), Color.Black.copy(alpha = 0.15f), Color.Black.copy(alpha = 0.40f)))),
     ) {
         // ---------- Home ----------
         Column(
