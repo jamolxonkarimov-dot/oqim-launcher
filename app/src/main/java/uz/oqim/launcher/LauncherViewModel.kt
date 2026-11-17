@@ -1,6 +1,10 @@
 package uz.oqim.launcher
 
 import android.app.Application
+import android.app.WallpaperManager
+import android.os.Build
+import androidx.compose.ui.graphics.Color
+import androidx.core.graphics.ColorUtils
 import android.app.SearchManager
 import android.content.ComponentName
 import android.content.Intent
@@ -60,6 +64,29 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
     private val favorites = MutableStateFlow(prefs.favorites)
     private val hidden = MutableStateFlow(prefs.hidden)
     private val query = MutableStateFlow("")
+
+    val accent: Color = computeAccent()
+
+    private fun computeAccent(): Color {
+        val fallback = Color(0xFF7FD1C4)
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O_MR1) return fallback
+        return runCatching {
+            val argb = WallpaperManager.getInstance(context)
+                .getWallpaperColors(WallpaperManager.FLAG_SYSTEM)?.primaryColor?.toArgb() ?: return fallback
+            val hsl = FloatArray(3)
+            ColorUtils.colorToHSL(argb, hsl)
+            hsl[1] = maxOf(hsl[1], 0.45f)
+            hsl[2] = 0.72f // light enough to read on a dark scrim
+            Color(ColorUtils.HSLToColor(hsl))
+        }.getOrDefault(fallback)
+    }
+
+    fun expandNotifications() {
+        runCatching {
+            val sb = context.getSystemService("statusbar")
+            Class.forName("android.app.StatusBarManager").getMethod("expandNotificationsPanel").invoke(sb)
+        }
+    }
 
     private val _isDefaultHome = MutableStateFlow(true)
     val isDefaultHome: StateFlow<Boolean> = _isDefaultHome
